@@ -1,0 +1,867 @@
+openapi: 3.0.0
+servers:
+  - url: "https://api.vepuy.com/"
+    description: Production
+  - url: "https://sandbox-api.vepuy.com/"
+    description: Sandbox
+info:
+  title: Vepuy DOCS API REST
+  termsOfService: "https://www.vepuy.com/"
+  version: 1.0.16
+  contact:
+    email: contacto@vepuy.com.ve
+  x-logo:
+    url: "https://storage.googleapis.com/vepuy/public/info/wHj6vb5o5Kq5SA1we9oW-250x50.png"
+  license:
+    name: Apache License 2.0
+    url: "https://www.apache.org/licenses/LICENSE-2.0"
+
+  description: |
+    ## Introduction
+
+    Welcome to the Vepuy API! Our API allows you to access multiple endpoints, generate and manage payments using different methods, as well as retrieve information related to payments.
+
+    The API is designed around REST principles, featuring predictable URLs and a resource-oriented approach. It utilizes standard HTTP response codes to convey the outcome of API requests. All API responses are in JSON format, even in the case of errors.
+
+    When making requests, users should expect a 200 status code for successful operations. Any status code other than 200 indicates either an invalid request or an issue with the response. This typically occurs when the provided data fails validation checks performed by Vepuy.
+
+    ## Endpoint
+    If you have an account with Vepuy, you can access the REST API through the following endpoints:
+
+    | Environment  | Base URL                   |
+    |--------------|----------------------------|
+    | Production   | [https://api.vepuy.com/](https://api.vepuy.com/) |
+    | Sandbox      | [https://sandbox-api.vepuy.com/](https://sandbox-api.vepuy.com/) |
+
+    The Production endpoint provides direct access for generating real transactions. The Sandbox endpoint allows you to test your integration without affecting real data.
+
+    ## Authentication
+    To interact with the API, you need to authenticate using the Bearer authentication scheme. Follow these steps to authenticate with the API:
+
+    Remember to replace `your_public_token` and `your_private_token` with the access keys provided for your application.
+
+    1. **Get your access keys:** Before you can authenticate, you must obtain your unique access keys provided by Vepuy. This includes a Public Token and a Private Token.
+
+    2. **Include authentication headers:** In every API request you make, you must include the following authentication headers:
+
+      - `Authorization`: This header should contain "Bearer" followed by your Public Token.
+
+        Example: `Authorization: Bearer your_public_token`
+
+      - `Date`: This header should contain the timestamp in the format "YYYY-MM-DDTHH:MM:SSZ" in UTC. Ensure that the timestamp is not more than 5 minutes different from the current time.
+
+        Example in JavaScript: 
+        ```javascript
+        const date = new Date().toISOString();
+        ```
+
+        Example in PHP: 
+        ```php
+        $date = gmdate("Y-m-d\TH:i:s\Z");
+        ```
+
+        Example in Python: 
+        ```Python
+        from datetime import datetime
+        date = datetime.utcnow().isoformat()
+        ```
+      
+
+      - `Sign`: This header should contain a signature generated using HMAC-SHA256 with your Private Token and the timestamp (`Date`).
+
+        Example in JavaScript: 
+        ```JavaScript
+        const crypto = require('crypto');
+        const date = new Date().toISOString();
+        const your_private_token = 'your_private_token';
+        const message = date;
+        const key = Buffer.from(your_private_token, 'utf-8');
+        const hmac = crypto.createHmac('sha256', key);
+        hmac.update(message);
+        const sign = hmac.digest('hex');        
+        ```
+
+        Example in PHP: 
+        ```PHP
+        $sign = hash_hmac('sha256', $date, $your_private_token);
+        ```
+
+        Example in Python: 
+        ```Python
+        import hashlib
+        import hmac
+        import time
+
+        your_private_token = 'your_private_token'  # Reemplaza con tu token privado
+        date = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+        message = date.encode('utf-8')
+
+        # Genera la firma HMAC-SHA256
+        signature = hmac.new(your_private_token.encode('utf-8'), message, hashlib.sha256).hexdigest()
+        ```
+
+    3. **Make the request:** After including the authentication headers, you can securely make the request.
+
+    ### Examples in Various Programming Languages
+
+    Below are examples of how to implement authentication in different programming languages:
+
+    - **JavaScript:**
+      ```JavaScript
+      const date = new Date().toISOString();
+      const sign = crypto.createHmac('sha256', yourPrivateToken).update(date).digest('hex');
+      const headers = {
+          'Authorization': `Bearer ${yourPublicToken}`,
+          'Date': date,
+          'Sign': sign
+      };
+      ```
+
+    - **PHP:**
+      ```PHP
+      $date = gmdate("Y-m-d\TH:i:s\Z");
+      $sign = hash_hmac('sha256', $date, $your_private_token);
+      $headers = [
+          'Authorization' => 'Bearer ' . $your_public_token,
+          'Date' => $date,
+          'Sign' => $sign
+      ];
+      ```
+
+    - **Python:**
+      ```Python
+      import hashlib
+      import hmac
+      import datetime
+
+      date = datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+      private_key = "your_private_token"
+      public_key = "your_public_token"
+
+      message = date.encode('utf-8')
+      secret_key = private_key.encode('utf-8')
+
+      signature = hmac.new(secret_key, message, hashlib.sha256).hexdigest()
+
+      headers = {
+          'Authorization': f'Bearer {public_key}',
+          'Date': date,
+          'Sign': signature
+      }
+      ```
+      ## Sandbox payment
+      If you have an account with Vepuy, you can access the REST API through the following endpoints:
+
+      | Environment  | Base URL                   |
+      |--------------|----------------------------|
+      | TokenPublic  | prkey-5bb2191b1333-086f3d324e9f-20958482 |
+      | TokenPrivate | prscr-d938c621cd39-76ced650dae7-63c13446 |   
+
+    This example provides clear instructions on how to authenticate with the API and includes examples in different programming languages, including PHP. Be sure to replace `your_public_token` and `your_private_token` with the access keys provided for your application.
+paths:
+  /v1.0/payment:
+    post:
+      tags:
+        - Payment (PayIn)
+      summary: Create
+      description: |
+        This method allows you to create a payment order.
+
+        The `id` and `token` fields returned in this response must be stored securely
+        by the merchant to control the transaction.
+
+        As for `redirect_url`, it is the URL to which the user should be redirected.
+
+        Once the payer completes the payment, the result will be notified to the merchant endpoint that was provided in the `urlnotify` parameter, if it exists.
+      parameters:
+        - name: Authorization
+          in: header
+          description: The Authorization header containing the Bearer token.
+          required: true
+          schema:
+            type: string
+
+        - name: Date
+          in: header
+          description: The Date header containing the timestamp in "AAAA-MM-DDTHH:MM:SSZ" format.
+          required: true
+          schema:
+            type: string
+
+        - name: Sign
+          in: header
+          description: The Sign header containing the HMAC-SHA256 signature.
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - order
+                - amount
+                - subject
+                - urlreturn_failed
+                - urlreturn_pending
+                - urlreturn_success
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: "User's email, must be a valid email address."
+                order:
+                  type: string
+                  pattern: '^[a-zA-Z0-9]*$'
+                  description: "Unique order identifier, alphanumeric without spaces."
+                amount:
+                  type: integer
+                  description: "amount, integers only."
+                payment:
+                  type: string
+                  default: "all"
+                  description: "Type of payment. Consult allowed codes."
+                document:
+                  type: string
+                  description: "User's DNI, optional, specific format required (e.g., V18765123)."
+                phone:
+                  type: string
+                  pattern: '^(0412|0414|0424|0416|0426)[0-9]{7}$'
+                  description: "User's phone number, optional, specific format required (e.g., 04121234567)."
+                currency:
+                  type: string
+                  default: "VES"
+                  description: "Currency in ISO alphanumeric format, optional."
+                subject:
+                  type: string
+                  pattern: '^[a-zA-Z0-9 ]*$'
+                  description: "Description of the product or service, alphanumeric and spaces only."
+                urlnotify:
+                  type: string
+                  format: uri
+                  description: "Callback URL for notifications, optional, must be a valid URL."
+                urlreturn_failed:
+                  type: string
+                  format: uri
+                  description: "Return URL for failed payments, must be a valid URL."
+                urlreturn_pending:
+                  type: string
+                  format: uri
+                  description: "Return URL for pending payments, must be a valid URL."
+                urlreturn_success:
+                  type: string
+                  format: uri
+                  description: "Return URL for successful payments, must be a valid URL."
+              example:  # Ejemplo específico para el cuerpo de la solicitud
+                email: "user@domain.com"
+                order: "AZ999"
+                amount: 0
+                payment: "01021"
+                document: "V21876543"
+                phone: "04241876543"
+                currency: "VES"
+                subject: "Sale of product or service"
+                urlnotify: "https://www.domain.com/route-urlnotify"
+                urlreturn_failed: "https://www.domain.com/route-failed"
+                urlreturn_pending: "https://www.domain.com/route-pending"
+                urlreturn_success: "https://www.domain.com/route-success"
+      responses:
+        '200':
+          description: Payment processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+              example:  # Ejemplo específico para el cuerpo de la respuesta
+                id: 0123456789012345
+                token: "dvtrx-123456789012-123456789012-01245678"
+                status: "register"
+                created_at: "2021-02-03 04:05:06"
+                redirect_url: "/payment/dvtrx-123456789012-123456789012-01245678"
+                commerce:
+                  email: "user@domain.com"
+                  order: "AZ999"
+                  subject: "Sale of product or service"
+                  amount: 0
+                  currency: "VES"
+                  urlnotify: "https://www.domain.com/route-urlnotify"
+                  urlreturn_failed: "https://www.domain.com/route-failed"
+                  urlreturn_pending: "https://www.domain.com/route-pending"
+                  urlreturn_success: "https://www.domain.com/route-success"
+                payment:
+                  start: null
+                  end: null
+                  amount: 0
+                  fee: 0
+                  authorization: null
+                  currency: "VES"
+                  deposit:
+                    date: null
+                    liquidate: null
+                payer:
+                  dni: null
+                  phone: null
+        '400':
+          description: Invalid input data
+        '500':
+          description: Internal server error
+  
+  /v1.0/payment/{token}:
+    get:
+      tags:
+        - Payment (PayIn)
+      summary: Get
+      description: |
+        This method allows you to retrieve payment details by providing the payment token in the URL path.
+      parameters:
+        - name: token
+          in: path
+          required: true
+          description: The payment token obtained from a previous payment request.
+          schema:
+            type: string
+            
+        - name: Authorization
+          in: header
+          description: The Authorization header containing the Bearer token.
+          required: true
+          schema:
+            type: string
+
+        - name: Date
+          in: header
+          description: The Date header containing the timestamp in "AAAA-MM-DDTHH:MM:SSZ" format.
+          required: true
+          schema:
+            type: string
+
+        - name: Sign
+          in: header
+          description: The Sign header containing the HMAC-SHA256 signature.
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Payment processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+              example:  # Ejemplo específico para el cuerpo de la respuesta
+                id: 0123456789012345
+                token: "dvtrx-123456789012-123456789012-01245678"
+                status: "register"
+                created_at: "2021-02-03 04:05:06"
+                redirect_url: "/payment/dvtrx-123456789012-123456789012-01245678"
+                commerce:
+                  email: "user@domain.com"
+                  order: "AZ999"
+                  subject: "Sale of product or service"
+                  amount: 0
+                  currency: "VES"
+                  urlnotify: "https://www.domain.com/route-urlnotify"
+                  urlreturn_failed: "https://www.domain.com/route-failed"
+                  urlreturn_pending: "https://www.domain.com/route-pending"
+                  urlreturn_success: "https://www.domain.com/route-success"
+                payment:
+                  start: null
+                  end: null
+                  amount: 0
+                  fee: 0
+                  authorization: null
+                  currency: "VES"
+                  deposit:
+                    date: null
+                    liquidate: null
+                payer:
+                  dni: null
+                  phone: null
+        '400':
+          description: Invalid input data
+        '500':
+          description: Internal server error
+  
+  /v1.0/payment/?start_date=2022-01-01&end_date=2040-03-01&page=1&per_page=5000:
+    get:
+      tags:
+        - Payment (PayIn)
+      summary: All
+      description: |
+        This method allows you to retrieve a list of transactions based on specified criteria.
+      
+      parameters:
+        - name: Authorization
+          in: header
+          description: The Authorization header containing the Bearer token.
+          required: true
+          schema:
+            type: string
+
+        - name: Date
+          in: header
+          description: The Date header containing the timestamp in "AAAA-MM-DDTHH:MM:SSZ" format.
+          required: true
+          schema:
+            type: string
+
+        - name: Sign
+          in: header
+          description: The Sign header containing the HMAC-SHA256 signature.
+          required: true
+          schema:
+            type: string
+
+        - name: start_date
+          in: query
+          description: The start date for filtering transactions (e.g., 2022-01-01).
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          description: The end date for filtering transactions (e.g., 2032-03-01).
+          schema:
+            type: string
+            format: date
+        - name: page
+          in: query
+          description: The page number for pagination (e.g., 1).
+          schema:
+            type: integer
+            minimum: 1
+        - name: per_page
+          in: query
+          description: The number of records to return per page (e.g., 5000, maximum is 5000).
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 5000
+      responses:
+        '200':
+          description: List of transactions retrieved successfully
+          content:
+             application/json:
+              schema:
+                type: array
+                items:
+                  example:  # Ejemplo específico para el cuerpo de la respuesta
+                        id: 0123456789012345
+                        token: "dvtrx-123456789012-123456789012-01245678"
+                        status: "register"
+                        created_at: "2021-02-03 04:05:06"
+                        redirect_url: "/payment/dvtrx-123456789012-123456789012-01245678"
+                        commerce:
+                          email: "user@domain.com"
+                          order: "AZ999"
+                          subject: "Sale of product or service"
+                          amount: 0
+                          currency: "VES"
+                          urlnotify: "https://www.domain.com/route-urlnotify"
+                          urlreturn_failed: "https://www.domain.com/route-failed"
+                          urlreturn_pending: "https://www.domain.com/route-pending"
+                          urlreturn_success: "https://www.domain.com/route-success"
+                        payment:
+                          start: null
+                          end: null
+                          amount: 0
+                          fee: 0
+                          authorization: null
+                          currency: "VES"
+                          deposit:
+                            date: null
+                            liquidate: null
+                        payer:
+                          dni: null
+                          phone: null
+        '400':
+          description: Invalid input data
+        '500':
+          description: Internal server error
+  
+  /v1.0/payout:
+    post:
+      tags:
+        - Payment (PayOut)
+      summary: Create
+      description: |
+        This method allows you to create a payment order.
+        
+        The `token` fields returned in this response must be stored securely
+        
+        by the merchant to control the transaction.
+
+        Once the payment is executed, the result will be notified to the merchant endpoint provided in the urlnotify parameter, if it exists.
+      parameters:
+        - name: Authorization
+          in: header
+          description: The Authorization header containing the Bearer token.
+          required: true
+          schema:
+            type: string
+        - name: Date
+          in: header
+          description: The Date header containing the timestamp in "AAAA-MM-DDTHH:MM:SSZ" format.
+          required: true
+          schema:
+            type: string
+        - name: Sign
+          in: header
+          description: The Sign header containing the HMAC-SHA256 signature.
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - phone
+                - order
+                - subject
+                - amount
+                - bank
+                - urlnotify
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: "User's email, must be a valid email address."
+                phone:
+                  type: string
+                  pattern: '^(0412|0414|0424|0416|0426)[0-9]{7}$'
+                  description: "User's phone number, optional, specific format required (e.g., 04121234567)."
+                order:
+                  type: string
+                  pattern: '^[a-zA-Z0-9]*$'
+                  description: "Unique order identifier, alphanumeric without spaces."
+                subject:
+                  type: string
+                  pattern: '^[a-zA-Z0-9 ]*$'
+                  description: "Description of the product or service, alphanumeric and spaces only."
+                amount:
+                  type: integer
+                  description: "amount, integers only."
+                bank:
+                  type: object
+                  properties:
+                    name:
+                      pattern: '^[a-zA-Z0-9 ]*$'
+                      type: string
+                      description: "customer name"
+                    code:
+                      type: string
+                      description: "Type of payment. Consult allowed codes."
+                    document:
+                      type: string
+                      description: "User's DNI, optional, specific format required (e.g., V18765123)."
+                    num:
+                      type: string
+                      pattern: '^(0412|0414|0424|0416|0426)[0-9]{7}$'
+                      description: "User's phone number, optional, specific format required (e.g., 04121234567)."
+                urlnotify:
+                  type: string
+                  format: uri
+                  description: "Callback URL for notifications, optional, must be a valid URL."
+              example:
+                email: "user@domain.com"
+                phone: "04121234567"
+                order: "AZ999"
+                subject: "Abono"
+                amount: 0
+                bank:
+                  name: Client
+                  code: "0000"
+                  document: V21876543
+                  num: 04241876543
+                urlnotify: "https://www.domain.com/route-urlnotify"
+      responses:
+        '200':
+          description: processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+              example:
+                id: 123456789
+                token: "P987654321"
+                status: "register"
+        '400':
+          description: Invalid input data
+        '500':
+          description: Internal server error
+  
+  /v1.0/payout/{token}:
+    get:
+      tags:
+        - Payment (PayOut)
+      summary: Get
+      description: |
+        This method allows you to retrieve payment details by providing the payment token in the URL path.
+      parameters:
+        - name: token
+          in: path
+          required: true
+          description: The payment token obtained from a previous payment request.
+          schema:
+            type: string
+            
+        - name: Authorization
+          in: header
+          description: The Authorization header containing the Bearer token.
+          required: true
+          schema:
+            type: string
+
+        - name: Date
+          in: header
+          description: The Date header containing the timestamp in "AAAA-MM-DDTHH:MM:SSZ" format.
+          required: true
+          schema:
+            type: string
+
+        - name: Sign
+          in: header
+          description: The Sign header containing the HMAC-SHA256 signature.
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Payment details retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  status:
+                    type: string
+                  created_at:
+                    type: string
+                  commerce:
+                    type: object
+                    properties:
+                      email:
+                        type: string
+                      phone:
+                        type: string
+                      order:
+                        type: string
+                      subject:
+                        type: string
+                      amount:
+                        type: number
+                      bank:
+                        type: object
+                        properties:
+                          name:
+                            type: string
+                          document:
+                            type: string
+                          document_type:
+                            type: string
+                          code:
+                            type: string
+                          type:
+                            type: string
+                          num:
+                            type: string
+                          methoad:
+                            type: string
+                      urlnotify:
+                        type: string
+                  wallet:
+                    type: object
+                    properties:
+                      payout:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          create_at:
+                            type: string
+                          type:
+                            type: string
+                          subject:
+                            type: string
+                          amount:
+                            type: number
+                          currency:
+                            type: string
+                          deposit:
+                            type: object
+                            properties:
+                              date:
+                                type: string
+                              amount:
+                                type: number
+                      payout_tax:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          create_at:
+                            type: string
+                          type:
+                            type: string
+                          subject:
+                            type: string
+                          amount:
+                            type: number
+                          currency:
+                            type: string
+              example:
+                id: "P987654321"
+                status: "register"
+                created_at: "2040-01-02 03:04:05"
+                commerce:
+                  email: "user@domain.com"
+                  phone: "04241876543"
+                  order: "AZ999"
+                  subject: "Sale of product or service"
+                  amount: 0
+                  bank:
+                    name: "Name"
+                    document: "21876543"
+                    document_type: "V"
+                    code: "0000"
+                    type: null
+                    num: "04241876543"
+                    methoad: "mobile"
+                  urlnotify: "https://www.domain.com/route-urlnotify"
+                wallet:
+                  payout:
+                    id: "WP987654321"
+                    create_at: "2040-01-02 03:04:05"
+                    type: "expense"
+                    subject: "Cargo payout - WP987654321"
+                    amount: 0
+                    currency: "VES"
+                    deposit:
+                      date: null
+                      amount: 0
+                  payout_tax:
+                    id: "WPT87654321"
+                    create_at: "2040-01-02 03:04:05"
+                    type: "expense"
+                    subject: "Cargo tax payout - WPT87654321"
+                    amount: 0
+                    currency: "VES"
+        '404':
+          description: not found
+        '500':
+          description: Internal server error
+
+  /v1.0/payout/?start_date=2022-01-01&end_date=2040-03-01&page=1&per_page=5000:
+    get:
+      tags:
+        - Payment (PayOut)
+      summary: All
+      description: |
+        This method allows you to retrieve a list of transactions based on specified criteria.
+
+      parameters:
+        - name: Authorization
+          in: header
+          description: The Authorization header containing the Bearer token.
+          required: true
+          schema:
+            type: string
+
+        - name: Date
+          in: header
+          description: The Date header containing the timestamp in "AAAA-MM-DDTHH:MM:SSZ" format.
+          required: true
+          schema:
+            type: string
+
+        - name: Sign
+          in: header
+          description: The Sign header containing the HMAC-SHA256 signature.
+          required: true
+          schema:
+            type: string
+
+        - name: start_date
+          in: query
+          description: The start date for filtering transactions (e.g., 2022-01-01).
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          description: The end date for filtering transactions (e.g., 2032-03-01).
+          schema:
+            type: string
+            format: date
+        - name: page
+          in: query
+          description: The page number for pagination (e.g., 1).
+          schema:
+            type: integer
+            minimum: 1
+        - name: per_page
+          in: query
+          description: The number of records to return per page (e.g., 5000, maximum is 5000).
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 5000
+      responses:
+        '200':
+          description: Payment details retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  example:
+                    id: "P987654321"
+                    status: "register"
+                    created_at: "2040-01-02 03:04:05"
+                    commerce:
+                      email: "user@domain.com"
+                      phone: "04241876543"
+                      order: "AZ999"
+                      subject: "Sale of product or service"
+                      amount: 0
+                      bank:
+                        name: "Name"
+                        document: "21876543"
+                        document_type: "V"
+                        code: "0000"
+                        type: null
+                        num: "04241876543"
+                        methoad: "mobile"
+                      urlnotify: "https://www.domain.com/route-urlnotify"
+                    wallet:
+                      payout:
+                        id: "WP987654321"
+                        create_at: "2040-01-02 03:04:05"
+                        type: "expense"
+                        subject: "Cargo payout - WP987654321"
+                        amount: 0
+                        currency: "VES"
+                        deposit:
+                          date: null
+                          amount: 0
+                      payout_tax:
+                        id: "WPT87654321"
+                        create_at: "2040-01-02 03:04:05"
+                        type: "expense"
+                        subject: "Cargo tax payout - WPT87654321"
+                        amount: 0
+                        currency: "VES"
+        '404':
+          description: not found
+        '500':
+          description: Internal server error
+
